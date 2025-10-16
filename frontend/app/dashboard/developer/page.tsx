@@ -8,6 +8,7 @@ import { Section } from "@/components/ui";
 import { uploadToPinata } from "@/lib/ipfs";
 import { getContractWithWallet, getReadOnlyContract } from "@/lib/blockchain";
 import { ethers } from "ethers";
+import { useRouter } from "next/navigation";
 
 type AibomStatus = "Draft" | "Submitted" | "In Review" | "Approved" | "Rejected" | "Unknown";
 
@@ -20,12 +21,6 @@ type Model = {
   reason?: string;
 };
 
-type Draft = {
-  id: string;
-  updated: string;
-  content: string;
-};
-
 type AdvisoryView = {
   cid: string;
   scope: string;
@@ -35,6 +30,8 @@ type AdvisoryView = {
 };
 
 export default function DeveloperPage() {
+  const router = useRouter();
+
   const sidebar = [
     { id: "aibom", label: "AIBOM 등록" },
     { id: "docs", label: "인허가 문서 생성" },
@@ -45,13 +42,11 @@ export default function DeveloperPage() {
   const [cid, setCid] = useState("");
   const [statusMsg, setStatusMsg] = useState("");
   const [models, setModels] = useState<Model[]>([]);
-  const [drafts, setDrafts] = useState<Draft[]>([]);
-  const [openDraft, setOpenDraft] = useState<Draft | null>(null);
   const [selectedModel, setSelectedModel] = useState<number | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [advisories, setAdvisories] = useState<Record<number, AdvisoryView[]>>({});
 
-  // load models from chain
+  // Load models from chain
   async function loadModels() {
     try {
       const contract = getReadOnlyContract();
@@ -91,7 +86,7 @@ export default function DeveloperPage() {
     return () => clearInterval(id);
   }, []);
 
-  // IPFS upload for AIBOM file
+  // IPFS upload
   async function handleUpload() {
     if (!file) return alert("파일을 선택하세요!");
     try {
@@ -105,7 +100,7 @@ export default function DeveloperPage() {
     }
   }
 
-  // register on chain
+  // Register on chain
   async function handleRegister() {
     if (!cid) return alert("CID가 없습니다.");
     try {
@@ -121,40 +116,7 @@ export default function DeveloperPage() {
     }
   }
 
-  // Generate draft via LLM (backend API) - same as before (backend not in scope)
-  async function handleGenerateFromAIBOM() {
-    if (!cid) return alert("AIBOM CID가 없습니다.");
-    try {
-      setStatusMsg("🧠 인허가 문서 생성 중...");
-      const res = await fetch("/api/generate-doc", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cid }),
-      });
-      const data = await res.json();
-      const content = data?.content ?? `MFDS 인허가 문서 초안\n\nAIBOM CID: ${cid}\n생성일: ${new Date().toISOString()}`;
-      const newDraft: Draft = {
-        id: `MFDS-${Date.now()}`,
-        updated: new Date().toISOString().split("T")[0],
-        content,
-      };
-      setDrafts((p) => [newDraft, ...p]);
-      setStatusMsg("✅ 인허가 문서 초안 생성 완료!");
-    } catch (err) {
-      console.error(err);
-      setStatusMsg("❌ 인허가 문서 생성 실패");
-    }
-  }
-
-  // Export draft to PDF (client-side)
-  function handleExportPDF(draft: Draft) {
-    const doc = new jsPDF();
-    const lines = doc.splitTextToSize(draft.content, 180);
-    doc.text(lines, 10, 10);
-    doc.save(`${draft.id}.pdf`);
-  }
-
-  // Submit selected PDF to regulator: upload PDF to IPFS then submitReview(modelId, cid)
+  // Submit selected PDF to regulator
   async function handleSendPDFToRegulator() {
     if (!pdfFile) return alert("PDF 파일을 선택하세요!");
     if (selectedModel === null) return alert("제출할 모델을 선택하세요!");
@@ -173,7 +135,7 @@ export default function DeveloperPage() {
     }
   }
 
-  // fetch advisories for a model (developers can view advisories for their models)
+  // Load advisories
   async function loadAdvisoriesForModel(modelId: number) {
     try {
       const contract = getReadOnlyContract();
@@ -191,65 +153,71 @@ export default function DeveloperPage() {
     }
   }
 
-  // preview modal + UI
   return (
     <RoleGate allow={["developer"]}>
       <RoleDashboardLayout roleTitle="Developer" sidebar={sidebar}>
         {/* AIBOM 등록 */}
-        <Section id="aibom" title="AI 모델 및 AIBOM 등록" desc="IPFS 업로드 → CID 온체인 기록">
-          <input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-          <div className="mt-2 space-x-2">
-            <button onClick={handleUpload} className="rounded-lg border px-3 py-1">
+        <Section
+          id="aibom"
+          title="AI 모델 및 AIBOM 등록"
+          desc="IPFS 업로드 → CID 온체인 기록"
+        >
+          <input
+            type="file"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            className="mb-3"
+          />
+          <div className="space-x-2">
+            <button
+              onClick={handleUpload}
+              className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-gray-50"
+            >
               Upload to IPFS
             </button>
-            <button onClick={handleRegister} className="rounded-lg border px-3 py-1">
+            <button
+              onClick={handleRegister}
+              className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-gray-50"
+            >
               Register (on-chain)
             </button>
           </div>
-          <div className="mt-2 text-sm text-gray-700">{statusMsg}</div>
+          <div className="mt-3 text-sm text-gray-700">{statusMsg}</div>
         </Section>
 
         {/* 문서 생성 / 제출 */}
-        <Section id="docs" title="인허가 문서 생성" desc="LLM 기반 초안 생성 · PDF 제출 · 규제기관 전송">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Section
+          id="docs"
+          title="인허가 문서 생성"
+          desc="LLM 기반 초안 생성 · PDF 제출 · 규제기관 전송"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* left: Generate */}
-            <div className="rounded-xl border p-3">
-              <div className="text-sm font-medium mb-2">New draft</div>
-              <button onClick={handleGenerateFromAIBOM} className="rounded-lg border px-3 py-2 w-full">
+            <div className="rounded-2xl border p-6 shadow-md bg-white">
+              <div className="text-base font-semibold mb-4">New draft</div>
+              <p className="text-sm text-gray-600 mb-4">
+                AIBOM을 기반으로 인허가 문서 초안을 자동 생성합니다.
+              </p>
+              <button
+                onClick={() => router.push("/documents")}
+                className="w-full rounded-xl bg-black text-white py-3 text-base font-medium hover:bg-gray-800 transition"
+              >
                 Generate from AIBOM
               </button>
             </div>
 
-            {/* middle: drafts */}
-            <div className="rounded-xl border p-3">
-              <div className="text-sm font-medium mb-2">Drafts</div>
-              {drafts.length === 0 && <div className="text-sm text-gray-500">생성된 초안이 없습니다.</div>}
-              {drafts.map((d) => (
-                <div key={d.id} className="flex justify-between items-center py-1">
-                  <div>
-                    <div className="font-medium">{d.id}</div>
-                    <div className="text-gray-500 text-xs">Updated {d.updated}</div>
-                  </div>
-                  <div className="space-x-2">
-                    <button onClick={() => setOpenDraft(d)} className="rounded-lg border px-3 py-1">
-                      Open
-                    </button>
-                    <button onClick={() => handleExportPDF(d)} className="rounded-lg border px-3 py-1">
-                      Export PDF
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* right: send PDF to regulator */}
-            <div className="rounded-xl border p-3">
-              <div className="text-sm font-medium mb-2">Send to Regulator</div>
+            {/* right: Send to Regulator */}
+            <div className="rounded-2xl border p-6 shadow-md bg-white">
+              <div className="text-base font-semibold mb-4">Send to Regulator</div>
+              <p className="text-sm text-gray-600 mb-4">
+                완성된 인허가 문서를 규제기관으로 제출합니다.
+              </p>
 
               <select
-                className="w-full rounded border px-2 py-1 mb-2"
+                className="w-full rounded-lg border px-3 py-2 mb-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
                 value={selectedModel ?? ""}
-                onChange={(e) => setSelectedModel(e.target.value === "" ? null : Number(e.target.value))}
+                onChange={(e) =>
+                  setSelectedModel(e.target.value === "" ? null : Number(e.target.value))
+                }
               >
                 <option value="">Select Model</option>
                 {models.map((m) => (
@@ -259,12 +227,16 @@ export default function DeveloperPage() {
                 ))}
               </select>
 
-              <input type="file" accept="application/pdf" onChange={(e) => setPdfFile(e.target.files?.[0] ?? null)} className="mb-2 w-full text-sm" />
+              <input
+                type="file"
+                accept="application/pdf"
+                onChange={(e) => setPdfFile(e.target.files?.[0] ?? null)}
+                className="mb-4 w-full text-sm"
+              />
 
-              {/* Send button style as requested: black text, white background */}
               <button
                 onClick={handleSendPDFToRegulator}
-                className="rounded-lg border border-gray-300 px-3 py-2 bg-white text-black hover:bg-gray-50 transition w-full"
+                className="w-full rounded-xl border border-gray-300 py-3 text-base font-medium bg-white text-black hover:bg-gray-50 transition"
               >
                 Send PDF to Regulator
               </button>
@@ -273,10 +245,19 @@ export default function DeveloperPage() {
         </Section>
 
         {/* 심사 요청/상태 */}
-        <Section id="review" title="심사 요청/상태" desc="온체인 심사 상태 자동 동기화 (10초 주기)">
+        <Section
+          id="review"
+          title="심사 요청/상태"
+          desc="온체인 심사 상태 자동 동기화 (10초 주기)"
+        >
           <div className="flex justify-between items-center mb-2">
-            <div className="text-sm text-gray-600">DRAFT → SUBMITTED → IN_REVIEW → APPROVED/REJECTED</div>
-            <button onClick={loadModels} className="rounded-lg border px-3 py-1 text-sm hover:bg-gray-50">
+            <div className="text-sm text-gray-600">
+              DRAFT → SUBMITTED → IN_REVIEW → APPROVED/REJECTED
+            </div>
+            <button
+              onClick={loadModels}
+              className="rounded-lg border px-3 py-1 text-sm hover:bg-gray-50"
+            >
               🔄 Refresh
             </button>
           </div>
@@ -299,7 +280,9 @@ export default function DeveloperPage() {
                     <td className="py-2 pr-4">{m.modelId}</td>
                     <td className="py-2 pr-4 font-mono text-xs break-all">{m.cid}</td>
                     <td className="py-2 pr-4 font-medium">{m.aibom}</td>
-                    <td className="py-2 pr-4 text-gray-600">{m.reason && m.reason.length > 0 ? m.reason : "—"}</td>
+                    <td className="py-2 pr-4 text-gray-600">
+                      {m.reason && m.reason.length > 0 ? m.reason : "—"}
+                    </td>
                     <td className="py-2 pr-4">{m.released}</td>
                     <td className="py-2 pr-4">
                       <button
@@ -313,7 +296,9 @@ export default function DeveloperPage() {
                           advisories[m.modelId].map((a, i) => (
                             <div key={i} className="text-gray-700">
                               <div className="font-mono text-xs">{a.cid}</div>
-                              <div className="text-xs">Scope:{a.scope} Action:{a.action}</div>
+                              <div className="text-xs">
+                                Scope:{a.scope} Action:{a.action}
+                              </div>
                             </div>
                           ))
                         ) : (
@@ -327,19 +312,6 @@ export default function DeveloperPage() {
             </table>
           </div>
         </Section>
-
-        {/* preview modal */}
-        {openDraft && (
-          <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 max-w-2xl w-full">
-              <div className="flex justify-between items-center mb-3">
-                <h2 className="text-lg font-semibold">{openDraft.id}</h2>
-                <button onClick={() => setOpenDraft(null)}>✕</button>
-              </div>
-              <pre className="whitespace-pre-wrap text-sm text-gray-800">{openDraft.content}</pre>
-            </div>
-          </div>
-        )}
       </RoleDashboardLayout>
     </RoleGate>
   );

@@ -6,7 +6,7 @@ const RPC_URL: string = process.env.NEXT_PUBLIC_RPC_URL ?? "http://127.0.0.1:854
 
 export const CONTRACT_ADDRESS: string =
   process.env.NEXT_PUBLIC_AIBOM_CONTRACT_ADDRESS ??
-  "0x1fA02b2d6A771842690194Cf62D91bdd92BfE28d";
+  "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 
 const readOnlyProvider = new ethers.providers.JsonRpcProvider(RPC_URL);
 
