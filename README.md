@@ -33,6 +33,7 @@
 12. [기술 스택](#-기술-스택)
 13. [기대 효과 및 향후 계획](#-기대-효과-및-향후-계획)
 14. [기여 가이드라인](#-기여-가이드라인)
+15. [논문] (#-논문)
 
 ---
 
@@ -297,4 +298,19 @@ LLM 기반 챗봇을 통해 AIBOM 문서 및 관련 보안 문서를 자동 생�
 *   **향후 계획**: 영지식 증명(ZKP) 도입을 통한 데이터 프라이버시 강화 및 SPDX/CycloneDX 등 국제 표준과의 호환성 확보를 목표로 합니다.
 
 ---
+
+## 📄 논문 
+
+본 프로젝트는 AI 거버넌스 및 보안 관련 기존 연구 논문과 기술 자료를  
+직접 조사·분석한 후, 이를 바탕으로 시스템 구조를 설계하고  
+실제 동작하는 형태로 구현한 연구 기반 프로젝트입니다.  
+이 과정과 구현 결과를 정리하여 ICACT 학회 논문으로 작성하였습니다.
+
+- **논문 제목:** A Blockchain-based Governance Framework for AIBOM Integrity and Automated Regulatory Compliance
+- **학회:** ICACT (International Conference on Advanced Communications Technology)  
+- **설명:**  
+  본 논문은 기존 연구에서 제시된 AIBOM 개념과 AI 보안 요구사항을 분석하고,블록체인 및 IPFS를 결합한 실용적인 AI 거버넌스 프레임워크를 제안합니다.  
+  본 저장소의 코드는 해당 연구 과정을 통해 도출된 설계를 실제 시스템으로 구현한 결과물입니다.
+
+👉 [논문 PDF 바로가기][A Blockchain-based Governance Framework for AIBOM Integrity and Automated Regulatory Compliance.pdf](https://github.com/user-attachments/files/25163092/A.Blockchain-based.Governance.Framework.for.AIBOM.Integrity.and.Automated.Regulatory.Compliance.pdf)
 
