@@ -23,17 +23,17 @@
 2. [핵심 문제 해결 전략](#-핵심-문제-해결-전략)
 3. [시스템 아키텍처](#-시스템-아키텍처)
 4. [주요 기능 구현 상세](#-주요-기능-구현-상세)
-5. [설치 및 실행](#-설치-및-실행)
-6. [사용 방법](#-사용-방법)
-7. [API 문서](#-api-문서)
-8. [코드 컨벤션](#-코드-컨벤션)
-9. [문제 해결](#-문제-해결)
-10. [프로젝트 구조](#-프로젝트-구조)
-11. [시현](#-시현)
-12. [기술 스택](#-기술-스택)
-13. [기대 효과 및 향후 계획](#-기대-효과-및-향후-계획)
-14. [기여 가이드라인](#-기여-가이드라인)
-15. [논문](#-논문)
+5. [블록체인 스마트 컨트랙트 개요](#-블록체인-스마트-컨트랙트-개요)
+6. [설치 및 실행](#-설치-및-실행)
+7. [사용 방법](#-사용-방법)
+8. [API 문서](#-api-문서)
+9. [코드 컨벤션](#-코드-컨벤션)
+10. [문제 해결](#-문제-해결)
+11. [프로젝트 구조](#-프로젝트-구조)
+12. [시현](#-시현)
+13. [기술 스택](#-기술-스택)
+14. [기대 효과 및 향후 계획](#-기대-효과-및-향후-계획)
+15. [기여 가이드라인](#-기여-가이드라인)
 
 ---
 
@@ -63,6 +63,188 @@ iSBOMB 프레임워크는 논리적으로 분리된 3개 계층으로 구성됩�
 
 ---
 
+## 📄 블록체인 스마트 컨트랙트 개요
+
+`AIBOMRegistry.sol`은 **AIBOM(AI Bill of Materials)** 및 관련 규제 문서를  
+**온체인에서 투명하고 신뢰성 있게 관리**하기 위한 핵심 스마트 컨트랙트입니다.
+
+본 컨트랙트는 AI 시스템의 구성 요소와 규제 대응 문서를 블록체인에 기록함으로써,  
+AI 개발자, 감독자, 규제 기관 간의 **책임 분리된 상호작용**과  
+**감사 가능성(Auditability)** 을 보장하는 것을 목표로 합니다.
+
+---
+
+## 🔑 주요 기능
+
+### 1️⃣ AIBOM 등록
+- 개발자는 새로운 AIBOM을 온체인에 등록할 수 있습니다.
+- 등록 시 고유한 `modelId`가 자동으로 할당됩니다.
+- 다음 정보가 블록체인에 저장됩니다.
+  - AIBOM 소유자 주소
+  - IPFS CID (Content Identifier)
+  - 등록 시각
+  - 검토 상태
+  - 검토 사유
+
+
+
+### 2️⃣ 규제 문서 제출
+- 등록된 AIBOM에 대해 규제 기관 제출용 문서를 등록할 수 있습니다.
+- 각 문서는 다음 정보를 포함합니다.
+  - IPFS CID
+  - 제출 시각
+  - 문서 설명
+
+
+
+### 3️⃣ 검토 상태 관리
+- 컨트랙트 소유자는 AIBOM의 검토 상태를 관리할 수 있습니다.
+- 지원되는 검토 상태는 다음과 같습니다.
+  - `DRAFT`
+  - `SUBMITTED`
+  - `IN_REVIEW`
+  - `APPROVED`
+  - `REJECTED`
+
+
+
+### 4️⃣ 감독자(Supervisor) 관리
+- 컨트랙트 소유자는 감독자 계정을 추가하거나 제거할 수 있습니다.
+- 감독자는 제한된 관리 권한을 부여받아 특정 기능을 수행할 수 있습니다.
+
+
+
+### 5️⃣ 취약점(Vulnerability) 보고
+- 권한 있는 주체(소유자)는 특정 AIBOM과 관련된 보안 취약점을 보고할 수 있습니다.
+- 취약점 정보에는 다음이 포함됩니다.
+  - IPFS CID
+  - 심각도(severity)
+  - 등록 시각
+  - 활성 여부(active)
+
+
+
+### 6️⃣ 자문(Advisory) 기록
+- 감독자 또는 소유자는 AIBOM과 관련된 자문 기록을 등록할 수 있습니다.
+- 자문에는 다음 정보가 포함됩니다.
+  - IPFS CID
+  - 적용 범위(scope)
+  - 권고 조치(action)
+  - 등록 시각
+  - 보고자(reporter)
+
+
+
+### 7️⃣ 접근 제어
+- OpenZeppelin의 `Ownable` 컨트랙트를 상속하여 접근 제어를 구현합니다.
+- 기능별 권한을 분리하여 무단 접근 및 오남용을 방지합니다.
+
+
+
+## 🧱 핵심 데이터 구조
+
+| 구조체 | 설명 |
+|------|------|
+| `AIBOM` | AIBOM 기본 정보 (소유자, IPFS CID, 타임스탬프, 검토 상태, 검토 사유) |
+| `RegulatoryDossier` | 규제 기관 제출 문서 정보 |
+| `Vulnerability` | 보안 취약점 정보 |
+| `Advisory` | 자문 및 권고 이력 |
+
+
+
+## ⚙️ 컨트랙트 구성 요소
+
+### 🔹 상속 구조
+- OpenZeppelin `Ownable` 컨트랙트 상속
+- 컨트랙트 소유자(owner) 개념 도입
+- 주요 관리 기능은 `onlyOwner` 모디파이어로 제한
+
+
+
+### 🔹 열거형 (`enum`)
+
+```solidity
+enum ReviewStatus {
+    DRAFT,
+    SUBMITTED,
+    IN_REVIEW,
+    APPROVED,
+    REJECTED
+}
+```
+AIBOM의 검토 단계를 명확히 정의하여 상태 관리를 체계화합니다.
+
+
+
+## 🧱 구조체 (Structs)
+
+`AIBOMRegistry` 컨트랙트는 AIBOM 및 규제·보안 관련 정보를 명확히 분리된 구조체로 관리합니다.
+
+### 🔹 AIBOM
+AI 모델의 핵심 메타데이터를 저장하는 구조체입니다.
+
+- `owner` : AIBOM 소유자 주소
+- `cid` : AIBOM 문서의 IPFS CID
+- `timestamp` : 등록 시각
+- `status` : 검토 상태 (`ReviewStatus`)
+- `reviewReason` : 승인 또는 반려 사유
+
+
+
+### 🔹 RegulatoryDossier
+규제 기관 제출 문서 정보를 저장합니다.
+
+- `cid` : 규제 문서 IPFS CID
+- `timestamp` : 제출 시각
+- `description` : 문서 설명
+
+
+
+### 🔹 Vulnerability
+AIBOM과 연관된 보안 취약점 정보를 기록합니다.
+
+- `cid` : 취약점 상세 정보 IPFS CID
+- `timestamp` : 보고 시각
+- `severity` : 취약점 심각도
+- `active` : 활성 여부
+
+
+
+### 🔹 Advisory
+감독자 또는 소유자가 등록하는 자문(권고) 정보입니다.
+
+- `cid` : 자문 문서 IPFS CID
+- `scope` : 적용 범위
+- `action` : 권장 조치
+- `timestamp` : 기록 시각
+- `reporter` : 보고자 주소
+
+
+
+## ⚙️ 컨트랙트 구성 요소
+
+### 🔹 상속 구조
+- OpenZeppelin의 `Ownable` 컨트랙트를 상속
+- 컨트랙트 소유자(owner) 개념 도입
+- 핵심 관리 기능은 소유자만 실행 가능
+
+
+
+### 🔹 열거형 (`enum`)
+
+```solidity
+enum ReviewStatus {
+    DRAFT,
+    SUBMITTED,
+    IN_REVIEW,
+    APPROVED,
+    REJECTED
+}
+```
+AIBOM의 전체 검토 생명주기를 명확하게 정의하여 상태 기반 로직 처리를 단순화합니다.
+
+---
+
 ## 🛠 주요 기능 구현 상세
 
 ### ✅ DID 기반 신원 인증
@@ -76,6 +258,7 @@ iSBOMB 프레임워크는 논리적으로 분리된 3개 계층으로 구성됩�
 ### ✅ 사후 시장 감시 및 취약점 보고
 *   감독자(Supervisor)는 시장에 출시된 모델의 취약점을 분석하여 온체인 리포트를 제출합니다.
 *   리포트 내역과 트랜잭션 해시를 통해 보안 조치 과정을 투명하게 공개합니다.
+
 
 ---
 
@@ -256,11 +439,11 @@ LLM 기반 챗봇을 통해 AIBOM 문서 및 관련 보안 문서를 자동 생�
 
 ## 3. AIBOM 및 문서 등록 (IPFS + Blockchain)
 
-<img width="619" height="106" alt="스크린샷 2026-02-09 오전 1 53 34" src="https://github.com/user-attachments/assets/bf00b52b-237b-4bed-8e82-6519fb5a13a9" />
+<img width="619" height="106" alt="스크린샷 2026-02-09 오전 1 53 34" src="https://github.com/user-attachments/assets/bf00b52b-237b-4bed-8e82-619de88d6cd5" />
 
 생성된 AIBOM 및 문서를 IPFS에 업로드하고,반환된 CID(Content Identifier)를 블록체인에 등록합니다.
 
-<img width="731" height="89" alt="스크린샷 2026-02-09 오전 1 52 02" src="https://github.com/user-attachments/assets/ace77bc2-5a30-435d-a591-4d2ca98f3e30" />
+<img width="731" height="89" alt="스크린샷 2026-02-09 오전 1 52 02" src="https://github.com/user-attachments/assets/ace77bc2-5a30-435d-a5a1-4d2ca98f3e30" />
 
 등록이 완료되면 다음과 같은 알림이 표시됩니다.
 
@@ -298,14 +481,3 @@ LLM 기반 챗봇을 통해 AIBOM 문서 및 관련 보안 문서를 자동 생�
 *   **향후 계획**: 영지식 증명(ZKP) 도입을 통한 데이터 프라이버시 강화 및 SPDX/CycloneDX 등 국제 표준과의 호환성 확보를 목표로 합니다.
 
 ---
-
-## 📄 논문 
-
-본 프로젝트는 AI 거버넌스 및 보안 관련 기존 연구 논문과 기술 자료를 직접 조사·분석한 후, 이를 바탕으로 시스템 구조를 설계하고 실제 동작하는 형태로 구현한 연구 기반 프로젝트입니다.  
-이 과정과 구현 결과를 정리하여 ICACT 학회 논문으로 작성하였습니다.
-
-- **논문 제목:** A Blockchain-based Governance Framework for AIBOM Integrity and Automated Regulatory Compliance
-- **학회:** ICACT (International Conference on Advanced Communications Technology)
-  
-👉 [논문 PDF 바로가기][A Blockchain-based Governance Framework for AIBOM Integrity and Automated Regulatory Compliance.pdf](https://github.com/user-attachments/files/25163092/A.Blockchain-based.Governance.Framework.for.AIBOM.Integrity.and.Automated.Regulatory.Compliance.pdf)
-
