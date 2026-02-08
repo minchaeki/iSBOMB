@@ -439,11 +439,13 @@ LLM 기반 챗봇을 통해 AIBOM 문서 및 관련 보안 문서를 자동 생�
 
 ## 3. AIBOM 및 문서 등록 (IPFS + Blockchain)
 
-<img width="619" height="106" alt="스크린샷 2026-02-09 오전 1 53 34" src="https://github.com/user-attachments/assets/bf00b52b-237b-4bed-8e82-619de88d6cd5" />
+<img width="619" height="106" alt="스크린샷 2026-02-09 오전 1 53 34" src="https://github.com/user-attachments/assets/3c80c0a7-d0d5-4dbc-bc4b-86baf9325730" />
+
 
 생성된 AIBOM 및 문서를 IPFS에 업로드하고,반환된 CID(Content Identifier)를 블록체인에 등록합니다.
 
-<img width="731" height="89" alt="스크린샷 2026-02-09 오전 1 52 02" src="https://github.com/user-attachments/assets/ace77bc2-5a30-435d-a5a1-4d2ca98f3e30" />
+<img width="731" height="89" alt="스크린샷 2026-02-09 오전 1 52 02" src="https://github.com/user-attachments/assets/125b4419-a25f-4326-8607-f397fd9471c4" />
+
 
 등록이 완료되면 다음과 같은 알림이 표시됩니다.
 
