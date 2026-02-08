@@ -72,6 +72,18 @@ export declare namespace AIBOMRegistry {
     reviewReason: string;
   };
 
+  export type RegulatoryDossierStruct = {
+    cid: PromiseOrValue<string>;
+    timestamp: PromiseOrValue<BigNumberish>;
+    description: PromiseOrValue<string>;
+  };
+
+  export type RegulatoryDossierStructOutput = [string, BigNumber, string] & {
+    cid: string;
+    timestamp: BigNumber;
+    description: string;
+  };
+
   export type VulnerabilityStruct = {
     cid: PromiseOrValue<string>;
     timestamp: PromiseOrValue<BigNumberish>;
@@ -91,21 +103,22 @@ export interface AIBOMRegistryInterface extends utils.Interface {
   functions: {
     "addSupervisor(address)": FunctionFragment;
     "aiboms(uint256)": FunctionFragment;
-    "deactivateVulnerability(uint256,uint256)": FunctionFragment;
     "getAdvisories(uint256)": FunctionFragment;
     "getAllAIBOMs()": FunctionFragment;
     "getApprovedSubmissions(uint256)": FunctionFragment;
     "getMySubmissions(uint256)": FunctionFragment;
+    "getRegulatoryDossier(uint256)": FunctionFragment;
     "getVulnerabilities(uint256)": FunctionFragment;
     "nextModelId()": FunctionFragment;
     "owner()": FunctionFragment;
     "recordAdvisory(uint256,string,string,string)": FunctionFragment;
     "registerAIBOM(string)": FunctionFragment;
+    "regulatoryDossiers(uint256)": FunctionFragment;
     "removeSupervisor(address)": FunctionFragment;
     "renounceOwnership()": FunctionFragment;
     "reportVulnerability(uint256,string,string)": FunctionFragment;
     "setReviewStatus(uint256,uint8,string)": FunctionFragment;
-    "submitReview(uint256,string)": FunctionFragment;
+    "submitRegulatoryDossier(uint256,string,string)": FunctionFragment;
     "supervisors(address)": FunctionFragment;
     "transferOwnership(address)": FunctionFragment;
     "vulnerabilities(uint256,uint256)": FunctionFragment;
@@ -115,21 +128,22 @@ export interface AIBOMRegistryInterface extends utils.Interface {
     nameOrSignatureOrTopic:
       | "addSupervisor"
       | "aiboms"
-      | "deactivateVulnerability"
       | "getAdvisories"
       | "getAllAIBOMs"
       | "getApprovedSubmissions"
       | "getMySubmissions"
+      | "getRegulatoryDossier"
       | "getVulnerabilities"
       | "nextModelId"
       | "owner"
       | "recordAdvisory"
       | "registerAIBOM"
+      | "regulatoryDossiers"
       | "removeSupervisor"
       | "renounceOwnership"
       | "reportVulnerability"
       | "setReviewStatus"
-      | "submitReview"
+      | "submitRegulatoryDossier"
       | "supervisors"
       | "transferOwnership"
       | "vulnerabilities"
@@ -142,10 +156,6 @@ export interface AIBOMRegistryInterface extends utils.Interface {
   encodeFunctionData(
     functionFragment: "aiboms",
     values: [PromiseOrValue<BigNumberish>]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "deactivateVulnerability",
-    values: [PromiseOrValue<BigNumberish>, PromiseOrValue<BigNumberish>]
   ): string;
   encodeFunctionData(
     functionFragment: "getAdvisories",
@@ -161,6 +171,10 @@ export interface AIBOMRegistryInterface extends utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "getMySubmissions",
+    values: [PromiseOrValue<BigNumberish>]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getRegulatoryDossier",
     values: [PromiseOrValue<BigNumberish>]
   ): string;
   encodeFunctionData(
@@ -186,6 +200,10 @@ export interface AIBOMRegistryInterface extends utils.Interface {
     values: [PromiseOrValue<string>]
   ): string;
   encodeFunctionData(
+    functionFragment: "regulatoryDossiers",
+    values: [PromiseOrValue<BigNumberish>]
+  ): string;
+  encodeFunctionData(
     functionFragment: "removeSupervisor",
     values: [PromiseOrValue<string>]
   ): string;
@@ -210,8 +228,12 @@ export interface AIBOMRegistryInterface extends utils.Interface {
     ]
   ): string;
   encodeFunctionData(
-    functionFragment: "submitReview",
-    values: [PromiseOrValue<BigNumberish>, PromiseOrValue<string>]
+    functionFragment: "submitRegulatoryDossier",
+    values: [
+      PromiseOrValue<BigNumberish>,
+      PromiseOrValue<string>,
+      PromiseOrValue<string>
+    ]
   ): string;
   encodeFunctionData(
     functionFragment: "supervisors",
@@ -232,10 +254,6 @@ export interface AIBOMRegistryInterface extends utils.Interface {
   ): Result;
   decodeFunctionResult(functionFragment: "aiboms", data: BytesLike): Result;
   decodeFunctionResult(
-    functionFragment: "deactivateVulnerability",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
     functionFragment: "getAdvisories",
     data: BytesLike
   ): Result;
@@ -249,6 +267,10 @@ export interface AIBOMRegistryInterface extends utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "getMySubmissions",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "getRegulatoryDossier",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -269,6 +291,10 @@ export interface AIBOMRegistryInterface extends utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "regulatoryDossiers",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "removeSupervisor",
     data: BytesLike
   ): Result;
@@ -285,7 +311,7 @@ export interface AIBOMRegistryInterface extends utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "submitReview",
+    functionFragment: "submitRegulatoryDossier",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -305,28 +331,22 @@ export interface AIBOMRegistryInterface extends utils.Interface {
     "AIBOMRegistered(uint256,address,string)": EventFragment;
     "AdvisoryRecorded(uint256,string,address)": EventFragment;
     "OwnershipTransferred(address,address)": EventFragment;
-    "ReviewApprovedWithSubmission(uint256,string,string)": EventFragment;
-    "ReviewStatusChanged(uint256,uint8)": EventFragment;
-    "ReviewSubmitted(uint256,string)": EventFragment;
-    "VulnerabilityDeactivated(uint256,uint256)": EventFragment;
+    "RegulatoryDossierSubmitted(uint256,string)": EventFragment;
+    "ReviewStatusChanged(uint256,uint8,string)": EventFragment;
     "VulnerabilityReported(uint256,string,string)": EventFragment;
   };
 
   getEvent(nameOrSignatureOrTopic: "AIBOMRegistered"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "AdvisoryRecorded"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "OwnershipTransferred"): EventFragment;
-  getEvent(
-    nameOrSignatureOrTopic: "ReviewApprovedWithSubmission"
-  ): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "RegulatoryDossierSubmitted"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "ReviewStatusChanged"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "ReviewSubmitted"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "VulnerabilityDeactivated"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "VulnerabilityReported"): EventFragment;
 }
 
 export interface AIBOMRegisteredEventObject {
   modelId: BigNumber;
-  owner: string;
+  dev: string;
   cid: string;
 }
 export type AIBOMRegisteredEvent = TypedEvent<
@@ -361,53 +381,30 @@ export type OwnershipTransferredEvent = TypedEvent<
 export type OwnershipTransferredEventFilter =
   TypedEventFilter<OwnershipTransferredEvent>;
 
-export interface ReviewApprovedWithSubmissionEventObject {
+export interface RegulatoryDossierSubmittedEventObject {
   modelId: BigNumber;
-  latestSubmissionCid: string;
-  reason: string;
+  cid: string;
 }
-export type ReviewApprovedWithSubmissionEvent = TypedEvent<
-  [BigNumber, string, string],
-  ReviewApprovedWithSubmissionEventObject
+export type RegulatoryDossierSubmittedEvent = TypedEvent<
+  [BigNumber, string],
+  RegulatoryDossierSubmittedEventObject
 >;
 
-export type ReviewApprovedWithSubmissionEventFilter =
-  TypedEventFilter<ReviewApprovedWithSubmissionEvent>;
+export type RegulatoryDossierSubmittedEventFilter =
+  TypedEventFilter<RegulatoryDossierSubmittedEvent>;
 
 export interface ReviewStatusChangedEventObject {
   modelId: BigNumber;
   status: number;
+  reason: string;
 }
 export type ReviewStatusChangedEvent = TypedEvent<
-  [BigNumber, number],
+  [BigNumber, number, string],
   ReviewStatusChangedEventObject
 >;
 
 export type ReviewStatusChangedEventFilter =
   TypedEventFilter<ReviewStatusChangedEvent>;
-
-export interface ReviewSubmittedEventObject {
-  modelId: BigNumber;
-  cid: string;
-}
-export type ReviewSubmittedEvent = TypedEvent<
-  [BigNumber, string],
-  ReviewSubmittedEventObject
->;
-
-export type ReviewSubmittedEventFilter = TypedEventFilter<ReviewSubmittedEvent>;
-
-export interface VulnerabilityDeactivatedEventObject {
-  modelId: BigNumber;
-  vulnIndex: BigNumber;
-}
-export type VulnerabilityDeactivatedEvent = TypedEvent<
-  [BigNumber, BigNumber],
-  VulnerabilityDeactivatedEventObject
->;
-
-export type VulnerabilityDeactivatedEventFilter =
-  TypedEventFilter<VulnerabilityDeactivatedEvent>;
 
 export interface VulnerabilityReportedEventObject {
   modelId: BigNumber;
@@ -467,12 +464,6 @@ export interface AIBOMRegistry extends BaseContract {
       }
     >;
 
-    deactivateVulnerability(
-      modelId: PromiseOrValue<BigNumberish>,
-      index: PromiseOrValue<BigNumberish>,
-      overrides?: Overrides & { from?: PromiseOrValue<string> }
-    ): Promise<ContractTransaction>;
-
     getAdvisories(
       modelId: PromiseOrValue<BigNumberish>,
       overrides?: CallOverrides
@@ -491,6 +482,11 @@ export interface AIBOMRegistry extends BaseContract {
       modelId: PromiseOrValue<BigNumberish>,
       overrides?: CallOverrides
     ): Promise<[string[]]>;
+
+    getRegulatoryDossier(
+      modelId: PromiseOrValue<BigNumberish>,
+      overrides?: CallOverrides
+    ): Promise<[AIBOMRegistry.RegulatoryDossierStructOutput]>;
 
     getVulnerabilities(
       modelId: PromiseOrValue<BigNumberish>,
@@ -513,6 +509,17 @@ export interface AIBOMRegistry extends BaseContract {
       cid: PromiseOrValue<string>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<ContractTransaction>;
+
+    regulatoryDossiers(
+      arg0: PromiseOrValue<BigNumberish>,
+      overrides?: CallOverrides
+    ): Promise<
+      [string, BigNumber, string] & {
+        cid: string;
+        timestamp: BigNumber;
+        description: string;
+      }
+    >;
 
     removeSupervisor(
       who: PromiseOrValue<string>,
@@ -537,9 +544,10 @@ export interface AIBOMRegistry extends BaseContract {
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<ContractTransaction>;
 
-    submitReview(
+    submitRegulatoryDossier(
       modelId: PromiseOrValue<BigNumberish>,
       cid: PromiseOrValue<string>,
+      desc: PromiseOrValue<string>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<ContractTransaction>;
 
@@ -585,12 +593,6 @@ export interface AIBOMRegistry extends BaseContract {
     }
   >;
 
-  deactivateVulnerability(
-    modelId: PromiseOrValue<BigNumberish>,
-    index: PromiseOrValue<BigNumberish>,
-    overrides?: Overrides & { from?: PromiseOrValue<string> }
-  ): Promise<ContractTransaction>;
-
   getAdvisories(
     modelId: PromiseOrValue<BigNumberish>,
     overrides?: CallOverrides
@@ -609,6 +611,11 @@ export interface AIBOMRegistry extends BaseContract {
     modelId: PromiseOrValue<BigNumberish>,
     overrides?: CallOverrides
   ): Promise<string[]>;
+
+  getRegulatoryDossier(
+    modelId: PromiseOrValue<BigNumberish>,
+    overrides?: CallOverrides
+  ): Promise<AIBOMRegistry.RegulatoryDossierStructOutput>;
 
   getVulnerabilities(
     modelId: PromiseOrValue<BigNumberish>,
@@ -631,6 +638,17 @@ export interface AIBOMRegistry extends BaseContract {
     cid: PromiseOrValue<string>,
     overrides?: Overrides & { from?: PromiseOrValue<string> }
   ): Promise<ContractTransaction>;
+
+  regulatoryDossiers(
+    arg0: PromiseOrValue<BigNumberish>,
+    overrides?: CallOverrides
+  ): Promise<
+    [string, BigNumber, string] & {
+      cid: string;
+      timestamp: BigNumber;
+      description: string;
+    }
+  >;
 
   removeSupervisor(
     who: PromiseOrValue<string>,
@@ -655,9 +673,10 @@ export interface AIBOMRegistry extends BaseContract {
     overrides?: Overrides & { from?: PromiseOrValue<string> }
   ): Promise<ContractTransaction>;
 
-  submitReview(
+  submitRegulatoryDossier(
     modelId: PromiseOrValue<BigNumberish>,
     cid: PromiseOrValue<string>,
+    desc: PromiseOrValue<string>,
     overrides?: Overrides & { from?: PromiseOrValue<string> }
   ): Promise<ContractTransaction>;
 
@@ -703,12 +722,6 @@ export interface AIBOMRegistry extends BaseContract {
       }
     >;
 
-    deactivateVulnerability(
-      modelId: PromiseOrValue<BigNumberish>,
-      index: PromiseOrValue<BigNumberish>,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
     getAdvisories(
       modelId: PromiseOrValue<BigNumberish>,
       overrides?: CallOverrides
@@ -727,6 +740,11 @@ export interface AIBOMRegistry extends BaseContract {
       modelId: PromiseOrValue<BigNumberish>,
       overrides?: CallOverrides
     ): Promise<string[]>;
+
+    getRegulatoryDossier(
+      modelId: PromiseOrValue<BigNumberish>,
+      overrides?: CallOverrides
+    ): Promise<AIBOMRegistry.RegulatoryDossierStructOutput>;
 
     getVulnerabilities(
       modelId: PromiseOrValue<BigNumberish>,
@@ -750,6 +768,17 @@ export interface AIBOMRegistry extends BaseContract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    regulatoryDossiers(
+      arg0: PromiseOrValue<BigNumberish>,
+      overrides?: CallOverrides
+    ): Promise<
+      [string, BigNumber, string] & {
+        cid: string;
+        timestamp: BigNumber;
+        description: string;
+      }
+    >;
+
     removeSupervisor(
       who: PromiseOrValue<string>,
       overrides?: CallOverrides
@@ -771,9 +800,10 @@ export interface AIBOMRegistry extends BaseContract {
       overrides?: CallOverrides
     ): Promise<void>;
 
-    submitReview(
+    submitRegulatoryDossier(
       modelId: PromiseOrValue<BigNumberish>,
       cid: PromiseOrValue<string>,
+      desc: PromiseOrValue<string>,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -804,12 +834,12 @@ export interface AIBOMRegistry extends BaseContract {
   filters: {
     "AIBOMRegistered(uint256,address,string)"(
       modelId?: PromiseOrValue<BigNumberish> | null,
-      owner?: PromiseOrValue<string> | null,
+      dev?: PromiseOrValue<string> | null,
       cid?: null
     ): AIBOMRegisteredEventFilter;
     AIBOMRegistered(
       modelId?: PromiseOrValue<BigNumberish> | null,
-      owner?: PromiseOrValue<string> | null,
+      dev?: PromiseOrValue<string> | null,
       cid?: null
     ): AIBOMRegisteredEventFilter;
 
@@ -833,43 +863,25 @@ export interface AIBOMRegistry extends BaseContract {
       newOwner?: PromiseOrValue<string> | null
     ): OwnershipTransferredEventFilter;
 
-    "ReviewApprovedWithSubmission(uint256,string,string)"(
+    "RegulatoryDossierSubmitted(uint256,string)"(
       modelId?: PromiseOrValue<BigNumberish> | null,
-      latestSubmissionCid?: null,
-      reason?: null
-    ): ReviewApprovedWithSubmissionEventFilter;
-    ReviewApprovedWithSubmission(
+      cid?: null
+    ): RegulatoryDossierSubmittedEventFilter;
+    RegulatoryDossierSubmitted(
       modelId?: PromiseOrValue<BigNumberish> | null,
-      latestSubmissionCid?: null,
-      reason?: null
-    ): ReviewApprovedWithSubmissionEventFilter;
+      cid?: null
+    ): RegulatoryDossierSubmittedEventFilter;
 
-    "ReviewStatusChanged(uint256,uint8)"(
+    "ReviewStatusChanged(uint256,uint8,string)"(
       modelId?: PromiseOrValue<BigNumberish> | null,
-      status?: null
+      status?: null,
+      reason?: null
     ): ReviewStatusChangedEventFilter;
     ReviewStatusChanged(
       modelId?: PromiseOrValue<BigNumberish> | null,
-      status?: null
+      status?: null,
+      reason?: null
     ): ReviewStatusChangedEventFilter;
-
-    "ReviewSubmitted(uint256,string)"(
-      modelId?: PromiseOrValue<BigNumberish> | null,
-      cid?: null
-    ): ReviewSubmittedEventFilter;
-    ReviewSubmitted(
-      modelId?: PromiseOrValue<BigNumberish> | null,
-      cid?: null
-    ): ReviewSubmittedEventFilter;
-
-    "VulnerabilityDeactivated(uint256,uint256)"(
-      modelId?: PromiseOrValue<BigNumberish> | null,
-      vulnIndex?: null
-    ): VulnerabilityDeactivatedEventFilter;
-    VulnerabilityDeactivated(
-      modelId?: PromiseOrValue<BigNumberish> | null,
-      vulnIndex?: null
-    ): VulnerabilityDeactivatedEventFilter;
 
     "VulnerabilityReported(uint256,string,string)"(
       modelId?: PromiseOrValue<BigNumberish> | null,
@@ -894,12 +906,6 @@ export interface AIBOMRegistry extends BaseContract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    deactivateVulnerability(
-      modelId: PromiseOrValue<BigNumberish>,
-      index: PromiseOrValue<BigNumberish>,
-      overrides?: Overrides & { from?: PromiseOrValue<string> }
-    ): Promise<BigNumber>;
-
     getAdvisories(
       modelId: PromiseOrValue<BigNumberish>,
       overrides?: CallOverrides
@@ -913,6 +919,11 @@ export interface AIBOMRegistry extends BaseContract {
     ): Promise<BigNumber>;
 
     getMySubmissions(
+      modelId: PromiseOrValue<BigNumberish>,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    getRegulatoryDossier(
       modelId: PromiseOrValue<BigNumberish>,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
@@ -939,6 +950,11 @@ export interface AIBOMRegistry extends BaseContract {
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<BigNumber>;
 
+    regulatoryDossiers(
+      arg0: PromiseOrValue<BigNumberish>,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     removeSupervisor(
       who: PromiseOrValue<string>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
@@ -962,9 +978,10 @@ export interface AIBOMRegistry extends BaseContract {
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<BigNumber>;
 
-    submitReview(
+    submitRegulatoryDossier(
       modelId: PromiseOrValue<BigNumberish>,
       cid: PromiseOrValue<string>,
+      desc: PromiseOrValue<string>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<BigNumber>;
 
@@ -996,12 +1013,6 @@ export interface AIBOMRegistry extends BaseContract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
-    deactivateVulnerability(
-      modelId: PromiseOrValue<BigNumberish>,
-      index: PromiseOrValue<BigNumberish>,
-      overrides?: Overrides & { from?: PromiseOrValue<string> }
-    ): Promise<PopulatedTransaction>;
-
     getAdvisories(
       modelId: PromiseOrValue<BigNumberish>,
       overrides?: CallOverrides
@@ -1015,6 +1026,11 @@ export interface AIBOMRegistry extends BaseContract {
     ): Promise<PopulatedTransaction>;
 
     getMySubmissions(
+      modelId: PromiseOrValue<BigNumberish>,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    getRegulatoryDossier(
       modelId: PromiseOrValue<BigNumberish>,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
@@ -1041,6 +1057,11 @@ export interface AIBOMRegistry extends BaseContract {
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<PopulatedTransaction>;
 
+    regulatoryDossiers(
+      arg0: PromiseOrValue<BigNumberish>,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     removeSupervisor(
       who: PromiseOrValue<string>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
@@ -1064,9 +1085,10 @@ export interface AIBOMRegistry extends BaseContract {
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<PopulatedTransaction>;
 
-    submitReview(
+    submitRegulatoryDossier(
       modelId: PromiseOrValue<BigNumberish>,
       cid: PromiseOrValue<string>,
+      desc: PromiseOrValue<string>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<PopulatedTransaction>;
 

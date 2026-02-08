@@ -4,13 +4,14 @@ import { useEffect, useState } from "react";
 import RoleDashboardLayout from "@/components/RoleDashboardLayout";
 import { Section } from "@/components/ui";
 import { getContractWithWallet, getReadOnlyContract } from "@/lib/blockchain";
+import { ethers } from "ethers";
 
 type QueueItem = {
   reqId: string;
   modelId: number;
   model: string;
   dev: string;
-  cid: string;
+  cid: string; // ✅ 규제기관은 제출문서 CID를 본다
   status: string;
 };
 
@@ -35,34 +36,48 @@ export default function RegulatorPage() {
   const [reason, setReason] = useState("");
   const [readLogs, setReadLogs] = useState<ReadRecord[]>([]);
   const [cidToVerify, setCidToVerify] = useState("");
-  const [gateway, setGateway] = useState("https://ipfs.io/ipfs/");
+  const [gateway, setGateway] = useState("https://gateway.pinata.cloud/ipfs/");
 
-  // Load queue from on-chain
+  // ✅ 규제기관이 볼 문서는 “제출문서 CID” 기준
   async function loadQueue() {
     try {
       const contract = getReadOnlyContract();
       const all = await contract.getAllAIBOMs();
-      const items: QueueItem[] = all
-        .map((a: any, idx: number) => ({
-          reqId: `REQ-${2025}-${idx}`,
-          modelId: idx,
-          model: `Model v${idx + 1}`,
-          dev: a.owner,
-          cid: a.cid,
-          status:
-            a.status === 0
-              ? "Draft"
-              : a.status === 1
-              ? "Submitted"
-              : a.status === 2
-              ? "In Review"
-              : a.status === 3
-              ? "Approved"
-              : a.status === 4
-              ? "Rejected"
-              : "Unknown",
-        }))
-        .filter((it: QueueItem) => it.status === "Submitted" || it.status === "In Review");
+      const items: QueueItem[] = [];
+
+      for (let idx = 0; idx < all.length; idx++) {
+        const a = all[idx];
+        const statusNum = Number(a.status);
+
+        // 각 모델의 제출문서 목록 가져오기
+        let submitCIDs: string[] = [];
+        try {
+          submitCIDs = await contract.getMySubmissions(idx); // 제출문서 배열
+        } catch (e) {
+          console.warn("getMySubmissions error", e);
+        }
+
+        // ✅ 규제기관은 "가장 마지막 제출문서 CID"를 봐야 함
+        const lastSubmitted = submitCIDs.length > 0 ? submitCIDs[submitCIDs.length - 1] : a.cid;
+
+        // 상태 필터링
+        if (statusNum === 1 || statusNum === 2) {
+          items.push({
+            reqId: `REQ-${2025}-${idx}`,
+            modelId: idx,
+            model: `Model v${idx + 1}`,
+            dev: a.owner,
+            cid: lastSubmitted, // ← 여기 핵심
+            status:
+              statusNum === 1
+                ? "Submitted"
+                : statusNum === 2
+                ? "In Review"
+                : "Unknown",
+          });
+        }
+      }
+
       setQueue(items.reverse());
     } catch (err) {
       console.error("loadQueue error", err);
@@ -73,61 +88,82 @@ export default function RegulatorPage() {
     loadQueue();
   }, []);
 
-  // Open dossier (download PDF from IPFS)
+  // ✅ 문서 열람 (IPFS 새 탭)
   async function handleOpenDossier(cid: string, reqId: string) {
     try {
-      setStatusMsg("📥 IPFS에서 문서 다운로드 중...");
-      const res = await fetch(`${gateway}${cid}`);
-      if (!res.ok) throw new Error("Failed to fetch IPFS file");
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${reqId}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      setStatusMsg("✅ 다운로드 완료");
+      setStatusMsg("📥 IPFS 문서를 새 탭에서 여는 중...");
+      const link = document.createElement("a");
+      link.href = `${gateway}${cid}`;
+      link.target = "_blank";
+      link.download = `${reqId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setStatusMsg("✅ 문서가 새 탭에서 열렸습니다.");
       setReadLogs((prev) => [{ reqId, ts: new Date().toISOString(), actor: "MFDS" }, ...prev]);
     } catch (err) {
       console.error(err);
-      setStatusMsg("❌ 다운로드 실패");
+      setStatusMsg("❌ 문서 열기 실패");
     }
   }
 
-  // Compare CID ↔ IPFS
+  // ✅ CID 무결성 비교
   async function handleCompareCID(cid: string) {
     try {
-      setStatusMsg("🔎 비교 중...");
+      setStatusMsg("🔎 IPFS에서 CID 검증 중...");
       const res = await fetch(`${gateway}${cid}`);
       if (!res.ok) throw new Error("IPFS fetch failed");
       const data = await res.arrayBuffer();
-      const len = data.byteLength;
-      setStatusMsg(`✅ IPFS fetch size: ${len} bytes (CID: ${cid})`);
+      setStatusMsg(`✅ IPFS 데이터 크기: ${data.byteLength} bytes`);
     } catch (err) {
       console.error(err);
-      setStatusMsg("❌ 비교 실패");
+      setStatusMsg("❌ CID 검증 실패");
     }
   }
 
-  // Submit decision on-chain
+  // ✅ 심사 결과 등록 (owner 검증)
   async function handleDecisionSubmit() {
     if (!requestId) return alert("Model ID를 입력하세요.");
     if (!reason) return alert("사유를 입력하세요.");
+
     try {
+      setStatusMsg("👤 규제기관 계정 확인 중...");
+      const contract = getReadOnlyContract();
+      const owner = await contract.owner();
+
+      const ethProvider = (window as any).ethereum;
+      if (!ethProvider) {
+        alert("MetaMask 또는 다른 이더리움 지갑이 필요합니다.");
+        setStatusMsg("🚫 이더리움 프로바이더를 찾을 수 없습니다.");
+        return;
+      }
+
+      const provider = new ethers.BrowserProvider(ethProvider);
+      const signer = await provider.getSigner();
+      const current = await signer.getAddress();
+
+      if (current.toLowerCase() !== owner.toLowerCase()) {
+        alert(
+          `⚠️ 접근 거부: 현재 계정은 규제기관(배포자) 계정이 아닙니다.\n\n배포자 주소: ${owner}\n현재 주소: ${current}`
+        );
+        setStatusMsg("🚫 규제기관 계정이 아닙니다. MetaMask 계정을 전환하세요.");
+        return;
+      }
+
       const modelId = Number(requestId);
       if (isNaN(modelId)) return alert("Model ID는 숫자여야 합니다.");
       setStatusMsg("⛓️ 심사 결과 온체인 기록 중...");
-      const contract = await getContractWithWallet();
+
+      const writable = await getContractWithWallet();
       const statusEnum = decision === "IN_REVIEW" ? 2 : decision === "APPROVED" ? 3 : 4;
-      const tx = await contract.setReviewStatus(modelId, statusEnum, reason);
+      const tx = await writable.setReviewStatus(modelId, statusEnum, reason);
       await tx.wait();
+
       setStatusMsg("✅ 심사 결과 온체인 반영 완료!");
       await loadQueue();
     } catch (err) {
       console.error(err);
-      setStatusMsg("❌ 심사 결과 반영 실패");
+      setStatusMsg("❌ 심사 결과 반영 실패 (owner 계정 확인 필요)");
     }
   }
 

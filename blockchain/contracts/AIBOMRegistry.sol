@@ -5,23 +5,35 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title AIBOMRegistry
- * @notice AIBOM (IPFS CID) 등록 및 심사 상태 / 제출문서 / 취약점 / 권고 기록용 온체인 레지스트리
+ * @notice 규제기관 문서와 AIBOM 문서를 분리 저장하는 온체인 레지스트리 (OpenZeppelin 4.x 대응 버전)
  */
 contract AIBOMRegistry is Ownable {
     // -------------------------
     // ENUMS
     // -------------------------
-    enum ReviewStatus { DRAFT, SUBMITTED, IN_REVIEW, APPROVED, REJECTED }
+    enum ReviewStatus {
+        DRAFT,
+        SUBMITTED,
+        IN_REVIEW,
+        APPROVED,
+        REJECTED
+    }
 
     // -------------------------
     // STRUCTS
     // -------------------------
     struct AIBOM {
         address owner;
-        string cid;
+        string cid; // AIBOM 문서 CID (감독기관용)
         uint256 timestamp;
         ReviewStatus status;
-        string reviewReason; // 규제기관이 승인/거절 시 남긴 사유
+        string reviewReason;
+    }
+
+    struct RegulatoryDossier {
+        string cid; // 규제기관 제출 문서 CID
+        uint256 timestamp;
+        string description; // 예: "MFDS 제출용 PDF"
     }
 
     struct Vulnerability {
@@ -32,41 +44,40 @@ contract AIBOMRegistry is Ownable {
     }
 
     struct Advisory {
-        string cid;       // advisory 문서 CID (IPFS) 또는 요약 텍스트
-        string scope;     // 범위 (예: v1.3.x)
-        string action;    // 권고 조치
+        string cid;
+        string scope;
+        string action;
         uint256 timestamp;
-        address reporter; // who registered
+        address reporter;
     }
 
     // -------------------------
     // STATE
     // -------------------------
     uint256 public nextModelId;
-    mapping(uint256 => AIBOM) public aiboms;                   // modelId -> AIBOM
-    mapping(uint256 => string[]) private submissions;          // modelId -> list of submitted doc CIDs (by dev)
-    mapping(uint256 => Vulnerability[]) public vulnerabilities;// modelId -> vulnerabilities
-    mapping(uint256 => Advisory[]) private advisories;         // modelId -> advisories (by supervisor)
-    mapping(address => bool) public supervisors;               // supervisor accounts
+    mapping(uint256 => AIBOM) public aiboms; // AIBOM 명세서 (감독기관)
+    mapping(uint256 => RegulatoryDossier) public regulatoryDossiers; // 규제기관 제출 문서
+    mapping(uint256 => string[]) private submissions; // AIBOM 관련 제출 로그
+    mapping(uint256 => Vulnerability[]) public vulnerabilities;
+    mapping(uint256 => Advisory[]) private advisories;
+    mapping(address => bool) public supervisors; // 감독기관 계정
 
     // -------------------------
     // EVENTS
     // -------------------------
-    event AIBOMRegistered(uint256 indexed modelId, address indexed owner, string cid);
-    event ReviewSubmitted(uint256 indexed modelId, string cid);
-    event ReviewStatusChanged(uint256 indexed modelId, ReviewStatus status);
-    event ReviewApprovedWithSubmission(uint256 indexed modelId, string latestSubmissionCid, string reason);
+    event AIBOMRegistered(uint256 indexed modelId, address indexed dev, string cid);
+    event RegulatoryDossierSubmitted(uint256 indexed modelId, string cid);
+    event ReviewStatusChanged(uint256 indexed modelId, ReviewStatus status, string reason);
     event VulnerabilityReported(uint256 indexed modelId, string cid, string severity);
-    event VulnerabilityDeactivated(uint256 indexed modelId, uint256 vulnIndex);
     event AdvisoryRecorded(uint256 indexed modelId, string cid, address reporter);
 
     // -------------------------
-    // CONSTRUCTOR
+    // CONSTRUCTOR (OZ 4.x 전용)
     // -------------------------
     constructor() Ownable(msg.sender) {}
 
     // -------------------------
-    // MODIFIERS / HELPERS
+    // ACCESS CONTROL
     // -------------------------
     modifier onlySupervisorOrOwner() {
         require(supervisors[msg.sender] || owner() == msg.sender, "Not authorized");
@@ -74,7 +85,7 @@ contract AIBOMRegistry is Ownable {
     }
 
     // -------------------------
-    // Supervisor management (owner only)
+    // Supervisor management
     // -------------------------
     function addSupervisor(address who) external onlyOwner {
         supervisors[who] = true;
@@ -87,6 +98,8 @@ contract AIBOMRegistry is Ownable {
     // -------------------------
     // Developer API
     // -------------------------
+
+    /// @notice AIBOM 등록 (감독기관용)
     function registerAIBOM(string calldata cid) external returns (uint256) {
         uint256 modelId = nextModelId++;
         aiboms[modelId] = AIBOM({
@@ -100,73 +113,72 @@ contract AIBOMRegistry is Ownable {
         return modelId;
     }
 
-    /**
-     * @notice developer가 규제기관에 제출(심사요청)할 때 호출 — 제출 CID는 submissions 배열에 추가
-     */
-    function submitReview(uint256 modelId, string calldata cid) external {
+    /// @notice 규제기관에 제출할 문서 등록
+    function submitRegulatoryDossier(
+        uint256 modelId,
+        string calldata cid,
+        string calldata desc
+    ) external {
         require(modelId < nextModelId, "Invalid modelId");
         require(aiboms[modelId].owner == msg.sender, "Not owner");
-        // Allow multiple submits (e.g. updated documents)
-        submissions[modelId].push(cid);
+
+        regulatoryDossiers[modelId] = RegulatoryDossier({
+            cid: cid,
+            timestamp: block.timestamp,
+            description: desc
+        });
+
         aiboms[modelId].status = ReviewStatus.SUBMITTED;
-        emit ReviewSubmitted(modelId, cid);
-        emit ReviewStatusChanged(modelId, ReviewStatus.SUBMITTED);
+        submissions[modelId].push(cid);
+
+        emit RegulatoryDossierSubmitted(modelId, cid);
+        emit ReviewStatusChanged(modelId, ReviewStatus.SUBMITTED, desc);
     }
 
     // -------------------------
     // Regulator (owner) API
     // -------------------------
-    /**
-     * @notice 규제기관(owner)이 심사상태 변경 (IN_REVIEW / APPROVED / REJECTED)
-     * @dev reason 파라미터를 받아서 aibom.reviewReason에 저장
-     */
-    function setReviewStatus(uint256 modelId, ReviewStatus status, string calldata reason) external onlyOwner {
+    function setReviewStatus(
+        uint256 modelId,
+        ReviewStatus status,
+        string calldata reason
+    ) external onlyOwner {
         require(modelId < nextModelId, "Invalid modelId");
         require(
             status == ReviewStatus.IN_REVIEW ||
-            status == ReviewStatus.APPROVED ||
-            status == ReviewStatus.REJECTED,
+                status == ReviewStatus.APPROVED ||
+                status == ReviewStatus.REJECTED,
             "Invalid status"
         );
 
         aiboms[modelId].status = status;
         aiboms[modelId].reviewReason = reason;
-        emit ReviewStatusChanged(modelId, status);
 
-        if (status == ReviewStatus.APPROVED) {
-            // emit latest submission CID (if any) for off-chain listeners
-            string memory latestCid = "";
-            if (submissions[modelId].length > 0) {
-                latestCid = submissions[modelId][submissions[modelId].length - 1];
-            }
-            emit ReviewApprovedWithSubmission(modelId, latestCid, reason);
-        }
+        emit ReviewStatusChanged(modelId, status, reason);
     }
 
     // -------------------------
     // Supervisor functionality
     // -------------------------
-    /**
-     * @notice supervisor 또는 owner 만 호출 가능. 그리고 모델 상태가 APPROVED 여야 제출문서 조회 허용
-     */
-    function getApprovedSubmissions(uint256 modelId) external view returns (string[] memory) {
+    function getApprovedSubmissions(uint256 modelId)
+        external
+        view
+        returns (string[] memory)
+    {
         require(modelId < nextModelId, "Invalid modelId");
         require(aiboms[modelId].status == ReviewStatus.APPROVED, "Model not approved");
         require(supervisors[msg.sender] || owner() == msg.sender, "Not authorized");
         return submissions[modelId];
     }
 
-    /**
-     * @notice supervisor가 문제를 발견하여 온체인으로 Advisory(권고)를 등록
-     */
     function recordAdvisory(
         uint256 modelId,
         string calldata cid,
         string calldata scope,
         string calldata action
-    ) external {
+    ) external onlySupervisorOrOwner {
         require(modelId < nextModelId, "Invalid modelId");
-        require(supervisors[msg.sender] || owner() == msg.sender, "Not authorized");
+
         Advisory memory a = Advisory({
             cid: cid,
             scope: scope,
@@ -179,7 +191,7 @@ contract AIBOMRegistry is Ownable {
     }
 
     // -------------------------
-    // Watchdog / Supervisor vulnerability (owner only)
+    // Watchdog / Vulnerability
     // -------------------------
     function reportVulnerability(
         uint256 modelId,
@@ -187,20 +199,15 @@ contract AIBOMRegistry is Ownable {
         string calldata severity
     ) external onlyOwner {
         require(modelId < nextModelId, "Invalid modelId");
-        vulnerabilities[modelId].push(Vulnerability({
-            cid: cid,
-            timestamp: block.timestamp,
-            severity: severity,
-            active: true
-        }));
+        vulnerabilities[modelId].push(
+            Vulnerability({
+                cid: cid,
+                timestamp: block.timestamp,
+                severity: severity,
+                active: true
+            })
+        );
         emit VulnerabilityReported(modelId, cid, severity);
-    }
-
-    function deactivateVulnerability(uint256 modelId, uint256 index) external onlyOwner {
-        require(modelId < nextModelId, "Invalid modelId");
-        require(index < vulnerabilities[modelId].length, "Invalid index");
-        vulnerabilities[modelId][index].active = false;
-        emit VulnerabilityDeactivated(modelId, index);
     }
 
     // -------------------------
@@ -214,16 +221,36 @@ contract AIBOMRegistry is Ownable {
         return list;
     }
 
-    function getVulnerabilities(uint256 modelId) external view returns (Vulnerability[] memory) {
+    function getRegulatoryDossier(uint256 modelId)
+        external
+        view
+        onlyOwner
+        returns (RegulatoryDossier memory)
+    {
+        return regulatoryDossiers[modelId];
+    }
+
+    function getVulnerabilities(uint256 modelId)
+        external
+        view
+        returns (Vulnerability[] memory)
+    {
         return vulnerabilities[modelId];
     }
 
-    function getAdvisories(uint256 modelId) external view returns (Advisory[] memory) {
+    function getAdvisories(uint256 modelId)
+        external
+        view
+        returns (Advisory[] memory)
+    {
         return advisories[modelId];
     }
 
-    // Developer convenience: developer can fetch their model's submissions
-    function getMySubmissions(uint256 modelId) external view returns (string[] memory) {
+    function getMySubmissions(uint256 modelId)
+        external
+        view
+        returns (string[] memory)
+    {
         require(modelId < nextModelId, "Invalid modelId");
         require(aiboms[modelId].owner == msg.sender, "Not owner");
         return submissions[modelId];

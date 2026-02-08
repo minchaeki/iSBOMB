@@ -7,7 +7,6 @@ import RoleDashboardLayout from "@/components/RoleDashboardLayout";
 import { Section } from "@/components/ui";
 import { uploadToPinata } from "@/lib/ipfs";
 import { getContractWithWallet, getReadOnlyContract } from "@/lib/blockchain";
-import { ethers } from "ethers";
 import { useRouter } from "next/navigation";
 
 type AibomStatus = "Draft" | "Submitted" | "In Review" | "Approved" | "Rejected" | "Unknown";
@@ -51,29 +50,29 @@ export default function DeveloperPage() {
     try {
       const contract = getReadOnlyContract();
       const all: any[] = await contract.getAllAIBOMs();
-      const parsed: Model[] = all.map((a: any, idx: number) => ({
-        modelId: idx,
-        version: `v1.${idx + 1}.0`,
-        released: new Date(
-          a.timestamp.toNumber ? a.timestamp.toNumber() * 1000 : Number(a.timestamp) * 1000
-        )
-          .toISOString()
-          .split("T")[0],
-        cid: a.cid,
-        aibom:
-          a.status === 0
-            ? "Draft"
-            : a.status === 1
-            ? "Submitted"
-            : a.status === 2
-            ? "In Review"
-            : a.status === 3
-            ? "Approved"
-            : a.status === 4
-            ? "Rejected"
-            : "Unknown",
-        reason: a.reviewReason ?? "",
-      }));
+      const parsed: Model[] = all.map((a: any, idx: number) => {
+        const statusNum = Number(a.status);
+        const timestamp = a.timestamp ? Number(a.timestamp) * 1000 : Date.now();
+        return {
+          modelId: idx,
+          version: `v1.${idx + 1}.0`,
+          released: new Date(timestamp).toISOString().split("T")[0],
+          cid: a.cid,
+          aibom:
+            statusNum === 0
+              ? "Draft"
+              : statusNum === 1
+              ? "Submitted"
+              : statusNum === 2
+              ? "In Review"
+              : statusNum === 3
+              ? "Approved"
+              : statusNum === 4
+              ? "Rejected"
+              : "Unknown",
+          reason: a.reviewReason ?? "",
+        };
+      });
       setModels(parsed.reverse());
     } catch (err) {
       console.error("loadModels error", err);
@@ -100,7 +99,7 @@ export default function DeveloperPage() {
     }
   }
 
-  // Register on chain
+  // Register AIBOM on-chain
   async function handleRegister() {
     if (!cid) return alert("CID가 없습니다.");
     try {
@@ -108,7 +107,7 @@ export default function DeveloperPage() {
       const contract = await getContractWithWallet();
       const tx = await contract.registerAIBOM(cid);
       await tx.wait();
-      setStatusMsg("✅ 온체인 등록 완료!");
+      setStatusMsg("✅ AIBOM 온체인 등록 완료!");
       await loadModels();
     } catch (err) {
       console.error(err);
@@ -116,18 +115,26 @@ export default function DeveloperPage() {
     }
   }
 
-  // Submit selected PDF to regulator
+  // ✅ 규제기관 제출용 문서 업로드 및 온체인 제출
   async function handleSendPDFToRegulator() {
     if (!pdfFile) return alert("PDF 파일을 선택하세요!");
     if (selectedModel === null) return alert("제출할 모델을 선택하세요!");
     try {
-      setStatusMsg("📤 PDF IPFS 업로드 중...");
+      setStatusMsg("📤 규제기관 제출 문서 IPFS 업로드 중...");
       const docCid = await uploadToPinata(pdfFile);
-      setStatusMsg("⛓️ 온체인 제출 중...");
+
+      setStatusMsg("⛓️ 규제기관 제출 온체인 기록 중...");
       const contract = await getContractWithWallet();
-      const tx = await contract.submitReview(selectedModel, docCid);
+
+      // ✅ 새 컨트랙트 함수명과 구조 반영
+      const tx = await contract.submitRegulatoryDossier(
+        selectedModel,
+        docCid,
+        "MFDS 제출용 문서"
+      );
       await tx.wait();
-      setStatusMsg(`✅ 규제기관에 제출 완료 (modelId=${selectedModel}, CID=${docCid})`);
+
+      setStatusMsg(`✅ 규제기관에 문서 제출 완료 (modelId=${selectedModel}, CID=${docCid})`);
       await loadModels();
     } catch (err) {
       console.error(err);
@@ -156,7 +163,7 @@ export default function DeveloperPage() {
   return (
     <RoleGate allow={["developer"]}>
       <RoleDashboardLayout roleTitle="Developer" sidebar={sidebar}>
-        {/* AIBOM 등록 */}
+        {/* 1️⃣ AIBOM 등록 */}
         <Section
           id="aibom"
           title="AI 모델 및 AIBOM 등록"
@@ -184,14 +191,13 @@ export default function DeveloperPage() {
           <div className="mt-3 text-sm text-gray-700">{statusMsg}</div>
         </Section>
 
-        {/* 문서 생성 / 제출 */}
+        {/* 2️⃣ 인허가 문서 생성 및 규제기관 제출 */}
         <Section
           id="docs"
           title="인허가 문서 생성"
           desc="LLM 기반 초안 생성 · PDF 제출 · 규제기관 전송"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* left: Generate */}
             <div className="rounded-2xl border p-6 shadow-md bg-white">
               <div className="text-base font-semibold mb-4">New draft</div>
               <p className="text-sm text-gray-600 mb-4">
@@ -205,7 +211,6 @@ export default function DeveloperPage() {
               </button>
             </div>
 
-            {/* right: Send to Regulator */}
             <div className="rounded-2xl border p-6 shadow-md bg-white">
               <div className="text-base font-semibold mb-4">Send to Regulator</div>
               <p className="text-sm text-gray-600 mb-4">
@@ -244,7 +249,7 @@ export default function DeveloperPage() {
           </div>
         </Section>
 
-        {/* 심사 요청/상태 */}
+        {/* 3️⃣ 심사 상태 모니터링 */}
         <Section
           id="review"
           title="심사 요청/상태"

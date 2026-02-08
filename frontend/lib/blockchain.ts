@@ -5,34 +5,43 @@ import AIBOMRegistryJson from "@/data/AIBOMRegistry.json";
 const RPC_URL: string = process.env.NEXT_PUBLIC_RPC_URL ?? "http://127.0.0.1:8545";
 
 export const CONTRACT_ADDRESS: string =
+  (AIBOMRegistryJson as any).address ??
   process.env.NEXT_PUBLIC_AIBOM_CONTRACT_ADDRESS ??
   "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 
-const readOnlyProvider = new ethers.providers.JsonRpcProvider(RPC_URL);
+// v6: top-level JsonRpcProvider
+const readOnlyProvider = new ethers.JsonRpcProvider(RPC_URL);
 
 /** 읽기 전용 컨트랙트 (Provider 사용) */
 export function getReadOnlyContract(): Contract {
-  return new ethers.Contract(CONTRACT_ADDRESS, AIBOMRegistryJson.abi, readOnlyProvider);
+  // ABI는 artifact 내부에 있으므로 any로 안전하게 전달
+  return new Contract(CONTRACT_ADDRESS, (AIBOMRegistryJson as any).abi, readOnlyProvider);
 }
 
-/** 브라우저용 Provider (MetaMask) */
-export function getBrowserProvider(): ethers.providers.Web3Provider {
+/** 브라우저용 Provider (MetaMask) - v6: BrowserProvider */
+export function getBrowserProvider(): ethers.BrowserProvider {
   if (typeof window === "undefined") {
     throw new Error("❌ 클라이언트 환경에서만 호출 가능");
   }
+
   const eth = (window as any).ethereum;
   if (!eth) throw new Error("❌ MetaMask가 설치되어 있지 않습니다.");
-  return new ethers.providers.Web3Provider(eth);
+
+  return new ethers.BrowserProvider(eth);
 }
 
 /**
  * 지갑이 연결된 컨트랙트 (Signer 포함)
- * - 로컬 하드햇(31337) 사용을 가정. 필요하면 chainId, RPC 바꿔서 사용하세요.
+ * - v6: provider.getSigner()는 async 이므로 await 필요
  */
 export async function getContractWithWallet(): Promise<Contract> {
   const provider = getBrowserProvider();
-  await provider.send("eth_requestAccounts", []);
-  const signer = provider.getSigner();
+
+  // 요청 방식 v6: BrowserProvider 사용 시 eth_requestAccounts 호출은 window.ethereum으로
+  await (window as any).ethereum.request({ method: "eth_requestAccounts" });
+
+  // v6: getSigner()는 async
+  const signer = await provider.getSigner();
 
   // 네트워크 체크 (하드햇 31337)
   const network = await provider.getNetwork();
@@ -45,7 +54,6 @@ export async function getContractWithWallet(): Promise<Contract> {
         params: [{ chainId: "0x7A69" }], // 31337 hex
       });
     } catch (error: any) {
-      // 체인이 없으면 추가하도록 시도 (optional)
       if (error?.code === 4902) {
         await (window as any).ethereum.request({
           method: "wallet_addEthereumChain",
@@ -64,32 +72,38 @@ export async function getContractWithWallet(): Promise<Contract> {
     }
   }
 
-  return new ethers.Contract(CONTRACT_ADDRESS, AIBOMRegistryJson.abi, signer);
+  // 타입 충돌 방지: signer 타입을 any로 캐스트해서 Contract에 넣음
+  return new Contract(CONTRACT_ADDRESS, (AIBOMRegistryJson as any).abi, signer as any);
 }
 
 /** 지갑 주소 조회 */
 export async function getWalletAddress(): Promise<string> {
   const provider = getBrowserProvider();
-  await provider.send("eth_requestAccounts", []);
-  const signer = provider.getSigner();
-  return signer.getAddress();
+  await (window as any).ethereum.request({ method: "eth_requestAccounts" });
+  const signer = await provider.getSigner();
+  return await signer.getAddress();
 }
 
 /**
  * 이벤트 로그에서 ReviewSubmitted 이벤트로부터 CID 가져오기
  * (provider는 읽기 전용 provider를 넣어 호출)
+ *
+ * provider 타입 단순화를 위해 any 사용 (실무에서는 구체 타입으로 바꿔도 됨)
  */
 export async function getReviewSubmittedCid(
-  provider: ethers.providers.Provider,
+  provider: any,
   contractAddress: string,
   modelId: number,
   fromBlock = 0,
   toBlock: number | "latest" = "latest"
 ): Promise<string | null> {
   try {
-    const iface = new ethers.utils.Interface(AIBOMRegistryJson.abi);
+    // v6: Interface는 ethers.Interface
+    const iface: any = new (ethers as any).Interface((AIBOMRegistryJson as any).abi);
     const eventTopic = iface.getEventTopic("ReviewSubmitted");
-    const modelTopic = ethers.utils.hexZeroPad(ethers.utils.hexlify(modelId), 32);
+
+    // v6: hex helpers can be different; use simple approach
+    const modelTopic = ethers.toBeHex(modelId, { size: 32 } as any);
 
     const logs = await provider.getLogs({
       address: contractAddress,

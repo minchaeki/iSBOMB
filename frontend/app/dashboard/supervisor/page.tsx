@@ -4,7 +4,7 @@ import { useState } from "react";
 import RoleDashboardLayout from "@/components/RoleDashboardLayout";
 import { Section } from "@/components/ui";
 import {
-  getApprovedSubmissionsForSupervisor,
+  getReadOnlyContract,
   recordAdvisoryOnChain,
   reportVulnerabilityOnChain,
 } from "@/lib/blockchain";
@@ -22,7 +22,7 @@ export default function SupervisorPage() {
   ];
 
   const [modelId, setModelId] = useState<string>("");
-  const [submissions, setSubmissions] = useState<string[]>([]);
+  const [aibomCid, setAibomCid] = useState<string>("");
   const [statusMsg, setStatusMsg] = useState<string>("");
 
   const [advisoryCid, setAdvisoryCid] = useState<string>("");
@@ -36,67 +36,66 @@ export default function SupervisorPage() {
   const [advisoriesList, setAdvisoriesList] = useState<any[]>([]);
   const [vulnerabilitiesList, setVulnerabilitiesList] = useState<any[]>([]);
 
-  // 승인된 모델 문서 조회
-  async function handleLoadApprovedSubmissions() {
+  // ✅ 규제기관이 승인한 모델의 AIBOM 문서 조회
+  async function handleLoadApprovedAIBOM() {
     if (!modelId) return alert("모델 ID를 입력하세요.");
     try {
-      setStatusMsg("🔐 메타마스크 연결 및 제출문서 조회 중...");
-      const arr = await getApprovedSubmissionsForSupervisor(Number(modelId));
-      setSubmissions(arr);
-      setStatusMsg(`✅ 제출문서 ${arr.length}개 조회됨`);
+      setStatusMsg("🔍 승인된 AIBOM 문서 조회 중...");
+      const contract = getReadOnlyContract();
+      const aibom = await contract.aiboms(Number(modelId));
+      setAibomCid(aibom.cid);
+      setStatusMsg(`✅ AIBOM 문서 조회 완료 (CID: ${aibom.cid})`);
     } catch (err: any) {
       console.error(err);
       const msg =
         err?.data?.message || err?.error?.message || err?.message || String(err);
-      if (msg.includes("Model not approved")) {
-        setStatusMsg("⚠️ 해당 모델은 아직 승인 상태가 아닙니다.");
-      } else if (msg.includes("Not authorized")) {
-        setStatusMsg("⚠️ 권한이 없습니다. 감독자 계정으로 로그인해야 합니다.");
+      if (msg.includes("not approved")) {
+        setStatusMsg("⚠️ 해당 모델은 아직 승인되지 않았습니다.");
       } else {
         setStatusMsg(`⚠️ 조회 실패: ${msg}`);
       }
     }
   }
 
-  // 권고 온체인 등록
+  // ✅ 권고 온체인 등록
   async function handleSaveAdvisory() {
     if (!modelId) return alert("모델 ID를 입력하세요.");
     if (!advisoryCid && !advisoryAction)
       return alert("권고 내용 또는 CID를 입력하세요.");
     try {
       setStatusMsg("⛓️ 온체인 권고 등록 중...");
-      const receipt = await recordAdvisoryOnChain(
+      const tx = await recordAdvisoryOnChain(
         Number(modelId),
         advisoryCid || "N/A",
         advisoryScope || "N/A",
         advisoryAction || "N/A"
       );
-      setStatusMsg(`✅ 권고 등록 완료 (tx: ${receipt.transactionHash ?? "n/a"})`);
+      setStatusMsg(`✅ 권고 등록 완료 (tx: ${tx.hash ?? "n/a"})`);
     } catch (err) {
       console.error(err);
-      setStatusMsg("❌ 권고 등록 실패");
+      setStatusMsg("❌ 권고 등록 실패 (owner 권한 확인 필요)");
     }
   }
 
-  // 취약점 온체인 보고
+  // ✅ 취약점 온체인 보고
   async function handleReportVuln() {
     if (!modelId) return alert("모델 ID를 입력하세요.");
     if (!vulnCid) return alert("취약점 CID를 입력하세요.");
     try {
       setStatusMsg("⛓️ 취약점 보고 중...");
-      const r = await reportVulnerabilityOnChain(Number(modelId), vulnCid, severity);
-      setStatusMsg(`✅ 취약점 보고 완료 (tx: ${r.transactionHash ?? "n/a"})`);
+      const tx = await reportVulnerabilityOnChain(Number(modelId), vulnCid, severity);
+      setStatusMsg(`✅ 취약점 보고 완료 (tx: ${tx.hash ?? "n/a"})`);
     } catch (err) {
       console.error(err);
       setStatusMsg("❌ 취약점 보고 실패 (owner 권한인지 확인하세요)");
     }
   }
 
-  // 온체인 권고/취약점 조회
+  // ✅ 온체인 권고/취약점 조회
   async function handleLoadAdvisoriesAndVulns() {
     if (!modelId) return alert("모델 ID를 입력하세요.");
     try {
-      const provider = new ethers.providers.JsonRpcProvider(
+      const provider = new ethers.JsonRpcProvider(
         process.env.NEXT_PUBLIC_RPC_URL ?? "http://127.0.0.1:8545"
       );
       const c = new ethers.Contract(
@@ -104,10 +103,26 @@ export default function SupervisorPage() {
         (await import("@/data/AIBOMRegistry.json")).default.abi,
         provider
       );
+
       const advs = await c.getAdvisories(Number(modelId));
       const vulns = await c.getVulnerabilities(Number(modelId));
-      setAdvisoriesList(advs ?? []);
-      setVulnerabilitiesList(vulns ?? []);
+
+      const parsedAdvs = advs.map((a: any) => ({
+        cid: a.cid,
+        scope: a.scope,
+        action: a.action,
+        reporter: a.reporter,
+      }));
+
+      const parsedVulns = vulns.map((v: any) => ({
+        cid: v.cid,
+        severity: v.severity,
+        active: Boolean(v.active),
+        timestamp: Number(v.timestamp),
+      }));
+
+      setAdvisoriesList(parsedAdvs);
+      setVulnerabilitiesList(parsedVulns);
       setStatusMsg("✅ 조회 완료");
     } catch (err) {
       console.error(err);
@@ -115,7 +130,7 @@ export default function SupervisorPage() {
     }
   }
 
-  // 모의 Broadcast
+  // ✅ 모의 Broadcast
   async function handleBroadcast() {
     if (!advisoryCid) return alert("먼저 권고를 등록하세요.");
     const log: BroadcastLog = {
@@ -132,11 +147,11 @@ export default function SupervisorPage() {
 
   return (
     <RoleDashboardLayout roleTitle="Supervisor" sidebar={sidebar}>
-      {/* 1️⃣ 승인된 문서 수신 */}
+      {/* 1️⃣ 승인된 AIBOM 문서 수신 */}
       <Section
         id="vuln"
         title="승인된 AI 문서 수신"
-        desc="규제기관이 승인한 모델의 제출문서(CID)를 조회합니다."
+        desc="규제기관이 승인한 모델의 AIBOM(CID)을 조회합니다."
       >
         <div className="rounded-2xl border p-6 shadow-sm bg-white mb-8">
           <div className="flex flex-wrap gap-3 mb-3">
@@ -148,40 +163,29 @@ export default function SupervisorPage() {
             />
             <button
               className="rounded-xl bg-black text-white px-4 py-2 font-medium hover:bg-gray-800 transition"
-              onClick={handleLoadApprovedSubmissions}
+              onClick={handleLoadApprovedAIBOM}
             >
-              제출문서 조회
-            </button>
-            <button
-              className="rounded-xl border px-4 py-2 font-medium hover:bg-gray-50"
-              onClick={handleLoadAdvisoriesAndVulns}
-            >
-              권고/취약점 새로고침
+              AIBOM 조회
             </button>
           </div>
 
           <div className="text-sm text-gray-700 mb-2">{statusMsg}</div>
 
-          <div>
-            {submissions.length === 0 && (
-              <div className="text-sm text-gray-500">
-                조회된 제출문서가 없습니다.
-              </div>
-            )}
-            {submissions.map((c, i) => (
-              <div key={i} className="py-2 border-t text-sm">
-                <div className="font-mono text-xs break-all">{c}</div>
-                <a
-                  className="text-blue-600 hover:underline"
-                  href={`https://ipfs.io/ipfs/${c}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Open on IPFS
-                </a>
-              </div>
-            ))}
-          </div>
+          {aibomCid ? (
+            <div className="border-t py-3 text-sm">
+              <div className="font-mono text-xs break-all">{aibomCid}</div>
+              <a
+                className="text-blue-600 hover:underline"
+                href={`https://ipfs.io/ipfs/${aibomCid}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open AIBOM on IPFS
+              </a>
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500">AIBOM 문서가 없습니다.</div>
+          )}
         </div>
       </Section>
 
@@ -189,7 +193,7 @@ export default function SupervisorPage() {
       <Section
         id="vulnerability"
         title="취약점 분석 및 보고"
-        desc="문서/취약점 발견 시 온체인 보고 및 권고 작성"
+        desc="AIBOM 문서 분석 후 취약점 및 권고를 온체인에 등록합니다."
       >
         <div className="rounded-2xl border p-6 shadow-sm bg-white mb-8">
           {/* 취약점 보고 */}
@@ -223,12 +227,6 @@ export default function SupervisorPage() {
               onClick={handleReportVuln}
             >
               온체인 취약점 보고
-            </button>
-            <button
-              className="rounded-xl border px-4 py-2 font-medium hover:bg-gray-50"
-              onClick={handleLoadAdvisoriesAndVulns}
-            >
-              권고/취약점 새로고침
             </button>
           </div>
 
@@ -271,9 +269,7 @@ export default function SupervisorPage() {
 
             {/* 권고 목록 */}
             <div className="mt-4">
-              <div className="text-sm font-semibold mb-2">
-                온체인에 기록된 권고
-              </div>
+              <div className="text-sm font-semibold mb-2">온체인에 기록된 권고</div>
               {advisoriesList.length === 0 && (
                 <div className="text-sm text-gray-500">권고 없음</div>
               )}
@@ -287,9 +283,7 @@ export default function SupervisorPage() {
 
             {/* 취약점 목록 */}
             <div className="mt-4">
-              <div className="text-sm font-semibold mb-2">
-                온체인에 기록된 취약점
-              </div>
+              <div className="text-sm font-semibold mb-2">온체인에 기록된 취약점</div>
               {vulnerabilitiesList.length === 0 && (
                 <div className="text-sm text-gray-500">기록 없음</div>
               )}

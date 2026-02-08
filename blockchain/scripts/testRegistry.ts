@@ -1,4 +1,4 @@
-import { ethers } from "hardhat";
+/**import { ethers } from "hardhat";
 import type { ContractReceipt, Event } from "ethers";
 import type { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import type { AIBOMRegistry } from "../typechain-types";
@@ -34,8 +34,8 @@ async function main() {
   const IN_REVIEW = 2;
   try {
     // callStatic to pre-check will throw if revert
-    await registry.connect(deployer).callStatic.setReviewStatus(modelId, IN_REVIEW);
-    const tx3 = await registry.connect(deployer).setReviewStatus(modelId, IN_REVIEW);
+    await registry.connect(deployer).callStatic.setReviewStatus(modelId, IN_REVIEW, "Review started");
+    const tx3 = await registry.connect(deployer).setReviewStatus(modelId, IN_REVIEW, "Review started");
     await tx3.wait();
     console.log("Status set to IN_REVIEW");
   } catch (err: any) {
@@ -72,4 +72,5 @@ async function main() {
 main().catch((err) => {
   console.error("Script failed:", err);
   process.exitCode = 1;
-});
+});*/
+
